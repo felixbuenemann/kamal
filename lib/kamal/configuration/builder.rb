@@ -2,7 +2,7 @@ class Kamal::Configuration::Builder
   include Kamal::Configuration::Validation
 
   attr_reader :config, :builder_config
-  delegate :image, :service, to: :config
+  delegate :image, :latest_tag, :service, to: :config
   delegate :server, to: :"config.registry"
 
   def initialize(config:)
@@ -78,6 +78,8 @@ class Kamal::Configuration::Builder
         cache_from_config_for_gha
       when "registry"
         cache_from_config_for_registry
+      when "inline"
+        cache_from_config_for_registry
       end
     end
   end
@@ -89,6 +91,8 @@ class Kamal::Configuration::Builder
         cache_to_config_for_gha
       when "registry"
         cache_to_config_for_registry
+      when "inline"
+        cache_to_config_for_inline
       end
     end
   end
@@ -116,7 +120,11 @@ class Kamal::Configuration::Builder
 
   private
     def cache_image
-      builder_config["cache"]&.fetch("image", nil) || "#{image}-build-cache"
+      if builder_config["cache"]["type"] == "inline"
+        "#{image}:#{latest_tag}"
+      else
+        builder_config["cache"]&.fetch("image", nil) || "#{image}-build-cache"
+      end
     end
 
     def cache_image_ref
@@ -137,6 +145,10 @@ class Kamal::Configuration::Builder
 
     def cache_to_config_for_registry
       [ "type=registry", builder_config["cache"]&.fetch("options", nil), "ref=#{cache_image_ref}" ].compact.join(",")
+    end
+
+    def cache_to_config_for_inline
+      [ "type=inline", builder_config["cache"]&.fetch("options", nil) ].compact.join(",")
     end
 
     def repo_basename
